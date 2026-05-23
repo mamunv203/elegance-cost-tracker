@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Innerwear Cost Tracker</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #16a085;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-color: #dddddd;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+        .config-section {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"], input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #148f77;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media(max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .actions button {
+            padding: 5px 10px;
+            margin-right: 5px;
+            font-size: 12px;
+        }
+        .btn-danger { background-color: #e74c3c; }
+        .btn-danger:hover { background-color: #c0392b; }
+        .btn-edit { background-color: #f39c12; }
+        .btn-edit:hover { background-color: #d35400; }
+        .status {
+            margin-top: 10px;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Elegance Innerwear Cost Tracker</h1>
+            <p>GitHub Pages & Google Sheets CRUD Application</p>
+        </header>
+
+        <div class="config-section">
+            <h3>1. Configuration (Setup Your API)</h3>
+            <div class="form-group">
+                <label for="webAppUrl">Google Apps Script Web App URL:</label>
+                <input type="text" id="webAppUrl" placeholder="https://script.google.com/macros/s/.../exec">
+            </div>
+            <button onclick="saveConfig()">Save URL</button>
+            <div id="configStatus" class="status"></div>
+        </div>
+
+        <div class="grid">
+            <div class="config-section">
+                <h3 id="formTitle">Add / Edit Data</h3>
+                <form id="crudForm" onsubmit="handleSubmit(event)">
+                    <input type="hidden" id="rowId">
+                    <div class="form-group">
+                        <label for="date">Date:</label>
+                        <input type="date" id="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Item Description:</label>
+                        <input type="text" id="description" required placeholder="e.g., Bra(6pcs*70)">
+                    </div>
+                    <div class="form-group">
+                        <label for="totalCost">Total Cost (BDT):</label>
+                        <input type="number" id="totalCost" step="0.01" required placeholder="0.00" oninput="calculateSplits()">
+                    </div>
+                    <div class="form-group">
+                        <label for="mamun">Mamun Cost (BDT):</label>
+                        <input type="number" id="mamun" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="hanif">Hanif Cost (BDT):</label>
+                        <input type="number" id="hanif" step="0.01" placeholder="0.00">
+                    </div>
+                    <button type="submit" id="submitBtn">Submit Data</button>
+                    <button type="button" onclick="resetForm()" style="background-color: #95a5a6;">Cancel</button>
+                </form>
+                <div id="formStatus" class="status"></div>
+            </div>
+
+            <div>
+                <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3>Data List</h3>
+                    <button onclick="fetchData()">Refresh Data</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Total (BDT)</th>
+                                <th>Mamun</th>
+                                <th>Hanif</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataBody">
+                            <!-- Data will be loaded here -->
+                            <tr>
+                                <td colspan="6" style="text-align:center;">Loading data or configuration missing...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load configurations
+        document.getElementById('webAppUrl').value = localStorage.getItem('webAppUrl') || '';
+        
+        function saveConfig() {
+            const url = document.getElementById('webAppUrl').value.trim();
+            localStorage.setItem('webAppUrl', url);
+            document.getElementById('configStatus').innerText = 'URL Saved Locally!';
+            fetchData();
+        }
+
+        function calculateSplits() {
+            // Optional auto split logic can be added here
+        }
+
+        function getAPIUrl() {
+            return localStorage.getItem('webAppUrl');
+        }
+
+        async function fetchData() {
+            const url = getAPIUrl();
+            if (!url) {
+                document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Please provide Web App URL first!</td></tr>';
+                return;
+            }
+            
+            document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center;">Fetching data...</td></tr>';
+            
+            try {
+                const response = await fetch(`${url}?action=read`);
+                const data = await response.json();
+                
+                let html = '';
+                if(data.length === 0 || (data.length === 1 && data[0].date === "")) {
+                    html = '<tr><td colspan="6" style="text-align:center;">No data found.</td></tr>';
+                } else {
+                    data.forEach(row => {
+                        if(!row.rowId) return; // Skip header formatting if structured
+                        html += `<tr>
+                            <td>${row.date || ''}</td>
+                            <td>${row.description || ''}</td>
+                            <td>${row.totalCost || '0.00'}</td>
+                            <td>${row.mamun || ''}</td>
+                            <td>${row.hanif || ''}</td>
+                            <td class="actions">
+                                <button class="btn-edit" onclick="editRow('${row.rowId}', '${row.date}', '${escapeHtml(row.description)}', '${row.totalCost}', '${row.mamun}', '${row.hanif}')">Edit</button>
+                                <button class="btn-danger" onclick="deleteRow('${row.rowId}')">Delete</button>
+                            </td>
+                        </tr>`;
+                    });
+                }
+                document.getElementById('dataBody').innerHTML = html;
+            } catch (error) {
+                document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Error loading data. Check Web App CORS/URL.</td></tr>';
+                console.error(error);
+            }
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        async function handleSubmit(e) {
+            e.preventDefault();
+            const url = getAPIUrl();
+            if (!url) return alert('Save Web App URL first!');
+
+            const rowId = document.getElementById('rowId').value;
+            const date = document.getElementById('date').value;
+            const description = document.getElementById('description').value;
+            const totalCost = document.getElementById('totalCost').value;
+            const mamun = document.getElementById('mamun').value;
+            const hanif = document.getElementById('hanif').value;
+
+            const action = rowId ? 'update' : 'create';
+            document.getElementById('formStatus').innerText = 'Processing...';
+
+            try {
+                let formData = new URLSearchParams();
+                formData.append('action', action);
+                formData.append('rowId', rowId);
+                formData.append('date', date);
+                formData.append('description', description);
+                formData.append('totalCost', totalCost);
+                formData.append('mamun', mamun);
+                formData.append('hanif', hanif);
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+                
+                const result = await response.json();
+                document.getElementById('formStatus').innerText = result.message || 'Success!';
+                resetForm();
+                fetchData();
+            } catch (error) {
+                document.getElementById('formStatus').innerText = 'Error saving data.';
+                console.error(error);
+            }
+        }
+
+        function editRow(rowId, date, description, totalCost, mamun, hanif) {
+            document.getElementById('formTitle').innerText = 'Edit Data';
+            document.getElementById('rowId').value = rowId;
+            document.getElementById('date').value = date;
+            document.getElementById('description').value = description;
+            document.getElementById('totalCost').value = totalCost;
+            document.getElementById('mamun').value = mamun === 'undefined' ? '' : mamun;
+            document.getElementById('hanif').value = hanif === 'undefined' ? '' : hanif;
+            document.getElementById('submitBtn').innerText = 'Update Data';
+        }
+
+        async function deleteRow(rowId) {
+            if(!confirm('Are you sure you want to delete this row?')) return;
+            const url = getAPIUrl();
+            
+            try {
+                let formData = new URLSearchParams();
+                formData.append('action', 'delete');
+                formData.append('rowId', rowId);
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+                const result = await response.json();
+                alert(result.message || 'Deleted successfully');
+                fetchData();
+            } catch (error) {
+                alert('Error deleting row.');
+                console.error(error);
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('formTitle').innerText = 'Add / Edit Data';
+            document.getElementById('rowId').value = '';
+            document.getElementById('crudForm').reset();
+            document.getElementById('submitBtn').innerText = 'Submit Data';
+        }
+
+        // Initial fetch if URL exists
+        if(getAPIUrl()) {
+            fetchData();
+        }
+    </script>
+</body>
+</html>
