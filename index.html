@@ -94,6 +94,11 @@
         tr:hover {
             background-color: #f1f1f1;
         }
+        .total-row {
+            background-color: #eaeded;
+            font-weight: bold;
+            border-top: 2px solid var(--primary-color);
+        }
         .actions button {
             padding: 5px 10px;
             margin-right: 5px;
@@ -114,11 +119,11 @@
     <div class="container">
         <header>
             <h1>Elegance Innerwear Cost Tracker</h1>
-            <p>GitHub Pages & Google Sheets CRUD Application</p>
+            <p>GitHub Pages & Google Sheets CRUD Application (With Auto Total)</p>
         </header>
 
         <div class="config-section">
-            <h3>1. Configuration (Setup Your API)</h3>
+            <h3>1. Configuration</h3>
             <div class="form-group">
                 <label for="webAppUrl">Google Apps Script Web App URL:</label>
                 <input type="text" id="webAppUrl" placeholder="https://script.google.com/macros/s/.../exec">
@@ -142,7 +147,7 @@
                     </div>
                     <div class="form-group">
                         <label for="totalCost">Total Cost (BDT):</label>
-                        <input type="number" id="totalCost" step="0.01" required placeholder="0.00" oninput="calculateSplits()">
+                        <input type="number" id="totalCost" step="0.01" required placeholder="0.00">
                     </div>
                     <div class="form-group">
                         <label for="mamun">Mamun Cost (BDT):</label>
@@ -176,11 +181,13 @@
                             </tr>
                         </thead>
                         <tbody id="dataBody">
-                            <!-- Data will be loaded here -->
                             <tr>
                                 <td colspan="6" style="text-align:center;">Loading data or configuration missing...</td>
                             </tr>
                         </tbody>
+                        <tfoot id="dataFoot">
+                            <!-- Total Row will be inserted here dynamically -->
+                        </tfoot>
                     </table>
                 </div>
             </div>
@@ -188,7 +195,6 @@
     </div>
 
     <script>
-        // Load configurations
         document.getElementById('webAppUrl').value = localStorage.getItem('webAppUrl') || '';
         
         function saveConfig() {
@@ -196,10 +202,6 @@
             localStorage.setItem('webAppUrl', url);
             document.getElementById('configStatus').innerText = 'URL Saved Locally!';
             fetchData();
-        }
-
-        function calculateSplits() {
-            // Optional auto split logic can be added here
         }
 
         function getAPIUrl() {
@@ -210,6 +212,7 @@
             const url = getAPIUrl();
             if (!url) {
                 document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Please provide Web App URL first!</td></tr>';
+                document.getElementById('dataFoot').innerHTML = '';
                 return;
             }
             
@@ -219,34 +222,63 @@
                 const response = await fetch(`${url}?action=read`);
                 const data = await response.json();
                 
-                let html = '';
+                let bodyHtml = '';
+                let grandTotalCost = 0;
+                let grandMamun = 0;
+                let grandHanif = 0;
+                let validRowsCount = 0;
+
                 if(data.length === 0 || (data.length === 1 && data[0].date === "")) {
-                    html = '<tr><td colspan="6" style="text-align:center;">No data found.</td></tr>';
+                    bodyHtml = '<tr><td colspan="6" style="text-align:center;">No data found.</td></tr>';
+                    document.getElementById('dataFoot').innerHTML = '';
                 } else {
                     data.forEach(row => {
-                        if(!row.rowId) return; // Skip header formatting if structured
-                        html += `<tr>
+                        if(!row.rowId) return;
+                        
+                        // Parse numbers safely for sum
+                        const totalVal = parseFloat(row.totalCost) || 0;
+                        const mamunVal = parseFloat(row.mamun) || 0;
+                        const hanifVal = parseFloat(row.hanif) || 0;
+
+                        grandTotalCost += totalVal;
+                        grandMamun += mamunVal;
+                        grandHanif += hanifVal;
+                        validRowsCount++;
+
+                        bodyHtml += `<tr>
                             <td>${row.date || ''}</td>
                             <td>${row.description || ''}</td>
-                            <td>${row.totalCost || '0.00'}</td>
-                            <td>${row.mamun || ''}</td>
-                            <td>${row.hanif || ''}</td>
+                            <td>${totalVal.toFixed(2)}</td>
+                            <td>${row.mamun !== "" && row.mamun !== undefined ? mamunVal.toFixed(2) : '0.00'}</td>
+                            <td>${row.hanif !== "" && row.hanif !== undefined ? hanifVal.toFixed(2) : '0.00'}</td>
                             <td class="actions">
-                                <button class="btn-edit" onclick="editRow('${row.rowId}', '${row.date}', '${escapeHtml(row.description)}', '${row.totalCost}', '${row.mamun}', '${row.hanif}')">Edit</button>
+                                <button class="btn-edit" onclick="editRow('${row.rowId}', '${row.date}', '${escapeHtml(row.description)}', '${totalVal}', '${row.mamun}', '${row.hanif}')">Edit</button>
                                 <button class="btn-danger" onclick="deleteRow('${row.rowId}')">Delete</button>
                             </td>
                         </tr>`;
                     });
+
+                    // Update Table Foot with Total Calculation Row
+                    let footHtml = `<tr class="total-row">
+                        <td colspan="2" style="text-align: right;">Total Sum:</td>
+                        <td>${grandTotalCost.toFixed(2)}</td>
+                        <td>${grandMamun.toFixed(2)}</td>
+                        <td>${grandHanif.toFixed(2)}</td>
+                        <td></td>
+                    </tr>`;
+                    document.getElementById('dataFoot').innerHTML = footHtml;
                 }
-                document.getElementById('dataBody').innerHTML = html;
+                document.getElementById('dataBody').innerHTML = bodyHtml;
             } catch (error) {
                 document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Error loading data. Check Web App CORS/URL.</td></tr>';
+                document.getElementById('dataFoot').innerHTML = '';
                 console.error(error);
             }
         }
 
         function escapeHtml(str) {
-            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            if(!str) return '';
+            return str.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
 
         async function handleSubmit(e) {
@@ -298,8 +330,8 @@
             document.getElementById('date').value = date;
             document.getElementById('description').value = description;
             document.getElementById('totalCost').value = totalCost;
-            document.getElementById('mamun').value = mamun === 'undefined' ? '' : mamun;
-            document.getElementById('hanif').value = hanif === 'undefined' ? '' : hanif;
+            document.getElementById('mamun').value = (mamun === 'undefined' || mamun === '') ? '' : mamun;
+            document.getElementById('hanif').value = (hanif === 'undefined' || hanif === '') ? '' : hanif;
             document.getElementById('submitBtn').innerText = 'Update Data';
         }
 
@@ -335,7 +367,6 @@
             document.getElementById('submitBtn').innerText = 'Submit Data';
         }
 
-        // Initial fetch if URL exists
         if(getAPIUrl()) {
             fetchData();
         }
