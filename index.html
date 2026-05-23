@@ -21,7 +21,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 1000px;
+            max-width: 1100px;
             margin: 0 auto;
         }
         header {
@@ -68,7 +68,7 @@
         }
         .grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1.3fr;
             gap: 20px;
         }
         @media(max-width: 768px) {
@@ -119,22 +119,22 @@
     <div class="container">
         <header>
             <h1>Elegance Innerwear Cost Tracker</h1>
-            <p>GitHub Pages & Google Sheets CRUD Application (With Auto Total)</p>
+            <p>GitHub Pages & Google Sheets Integration Dashboard</p>
         </header>
 
         <div class="config-section">
-            <h3>1. Configuration</h3>
+            <h3>1. Web App API Configuration</h3>
             <div class="form-group">
-                <label for="webAppUrl">Google Apps Script Web App URL:</label>
+                <label for="webAppUrl">Google Apps Script Deployment URL:</label>
                 <input type="text" id="webAppUrl" placeholder="https://script.google.com/macros/s/.../exec">
             </div>
-            <button onclick="saveConfig()">Save URL</button>
+            <button onclick="saveConfig()">Connect Web App</button>
             <div id="configStatus" class="status"></div>
         </div>
 
         <div class="grid">
             <div class="config-section">
-                <h3 id="formTitle">Add / Edit Data</h3>
+                <h3 id="formTitle">Insert / Update Entry</h3>
                 <form id="crudForm" onsubmit="handleSubmit(event)">
                     <input type="hidden" id="rowId">
                     <div class="form-group">
@@ -143,7 +143,7 @@
                     </div>
                     <div class="form-group">
                         <label for="description">Item Description:</label>
-                        <input type="text" id="description" required placeholder="e.g., Bra(6pcs*70)">
+                        <input type="text" id="description" required placeholder="e.g., Boxers / Innerwear Stock">
                     </div>
                     <div class="form-group">
                         <label for="totalCost">Total Cost (BDT):</label>
@@ -165,8 +165,8 @@
 
             <div>
                 <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-                    <h3>Data List</h3>
-                    <button onclick="fetchData()">Refresh Data</button>
+                    <h3>Live Database View</h3>
+                    <button onclick="fetchData()">🔄 Refresh Table</button>
                 </div>
                 <div style="overflow-x: auto;">
                     <table id="dataTable">
@@ -182,12 +182,10 @@
                         </thead>
                         <tbody id="dataBody">
                             <tr>
-                                <td colspan="6" style="text-align:center;">Loading data or configuration missing...</td>
+                                <td colspan="6" style="text-align:center;">Awaiting configuration link...</td>
                             </tr>
                         </tbody>
-                        <tfoot id="dataFoot">
-                            <!-- Total Row will be inserted here dynamically -->
-                        </tfoot>
+                        <tfoot id="dataFoot"></tfoot>
                     </table>
                 </div>
             </div>
@@ -200,7 +198,7 @@
         function saveConfig() {
             const url = document.getElementById('webAppUrl').value.trim();
             localStorage.setItem('webAppUrl', url);
-            document.getElementById('configStatus').innerText = 'URL Saved Locally!';
+            document.getElementById('configStatus').innerText = 'Web App API connected successfully!';
             fetchData();
         }
 
@@ -211,57 +209,52 @@
         async function fetchData() {
             const url = getAPIUrl();
             if (!url) {
-                document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Please provide Web App URL first!</td></tr>';
+                document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Please save your Apps Script URL!</td></tr>';
                 document.getElementById('dataFoot').innerHTML = '';
                 return;
             }
             
-            document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center;">Fetching data...</td></tr>';
+            document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center;">Fetching data from Google Sheet...</td></tr>';
             
             try {
                 const response = await fetch(`${url}?action=read`);
                 const data = await response.json();
                 
                 let bodyHtml = '';
-                let grandTotalCost = 0;
+                let grandTotal = 0;
                 let grandMamun = 0;
                 let grandHanif = 0;
-                let validRowsCount = 0;
 
-                if(data.length === 0 || (data.length === 1 && data[0].date === "")) {
-                    bodyHtml = '<tr><td colspan="6" style="text-align:center;">No data found.</td></tr>';
+                if (data.length === 0) {
+                    bodyHtml = '<tr><td colspan="6" style="text-align:center;">No data found in your Sheet.</td></tr>';
                     document.getElementById('dataFoot').innerHTML = '';
                 } else {
                     data.forEach(row => {
-                        if(!row.rowId) return;
-                        
-                        // Parse numbers safely for sum
+                        // Safe index mapping independent of string headers formatting
                         const totalVal = parseFloat(row.totalCost) || 0;
                         const mamunVal = parseFloat(row.mamun) || 0;
                         const hanifVal = parseFloat(row.hanif) || 0;
 
-                        grandTotalCost += totalVal;
+                        grandTotal += totalVal;
                         grandMamun += mamunVal;
                         grandHanif += hanifVal;
-                        validRowsCount++;
 
                         bodyHtml += `<tr>
                             <td>${row.date || ''}</td>
                             <td>${row.description || ''}</td>
                             <td>${totalVal.toFixed(2)}</td>
-                            <td>${row.mamun !== "" && row.mamun !== undefined ? mamunVal.toFixed(2) : '0.00'}</td>
-                            <td>${row.hanif !== "" && row.hanif !== undefined ? hanifVal.toFixed(2) : '0.00'}</td>
+                            <td>${mamunVal.toFixed(2)}</td>
+                            <td>${hanifVal.toFixed(2)}</td>
                             <td class="actions">
-                                <button class="btn-edit" onclick="editRow('${row.rowId}', '${row.date}', '${escapeHtml(row.description)}', '${totalVal}', '${row.mamun}', '${row.hanif}')">Edit</button>
+                                <button class="btn-edit" onclick="editRow('${row.rowId}', '${row.date}', '${escapeHtml(row.description)}', '${totalVal}', '${mamunVal}', '${hanifVal}')">Edit</button>
                                 <button class="btn-danger" onclick="deleteRow('${row.rowId}')">Delete</button>
                             </td>
                         </tr>`;
                     });
 
-                    // Update Table Foot with Total Calculation Row
                     let footHtml = `<tr class="total-row">
                         <td colspan="2" style="text-align: right;">Total Sum:</td>
-                        <td>${grandTotalCost.toFixed(2)}</td>
+                        <td>${grandTotal.toFixed(2)}</td>
                         <td>${grandMamun.toFixed(2)}</td>
                         <td>${grandHanif.toFixed(2)}</td>
                         <td></td>
@@ -270,7 +263,7 @@
                 }
                 document.getElementById('dataBody').innerHTML = bodyHtml;
             } catch (error) {
-                document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Error loading data. Check Web App CORS/URL.</td></tr>';
+                document.getElementById('dataBody').innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Error loading data. Make sure to Deploy as a "New Version" in Apps Script.</td></tr>';
                 document.getElementById('dataFoot').innerHTML = '';
                 console.error(error);
             }
@@ -290,11 +283,11 @@
             const date = document.getElementById('date').value;
             const description = document.getElementById('description').value;
             const totalCost = document.getElementById('totalCost').value;
-            const mamun = document.getElementById('mamun').value;
-            const hanif = document.getElementById('hanif').value;
+            const mamun = document.getElementById('mamun').value || '0';
+            const hanif = document.getElementById('hanif').value || '0';
 
             const action = rowId ? 'update' : 'create';
-            document.getElementById('formStatus').innerText = 'Processing...';
+            document.getElementById('formStatus').innerText = 'Saving data...';
 
             try {
                 let formData = new URLSearchParams();
@@ -309,9 +302,7 @@
                 const response = await fetch(url, {
                     method: 'POST',
                     body: formData,
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    }
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
                 });
                 
                 const result = await response.json();
@@ -325,14 +316,14 @@
         }
 
         function editRow(rowId, date, description, totalCost, mamun, hanif) {
-            document.getElementById('formTitle').innerText = 'Edit Data';
+            document.getElementById('formTitle').innerText = 'Edit Entry';
             document.getElementById('rowId').value = rowId;
             document.getElementById('date').value = date;
             document.getElementById('description').value = description;
             document.getElementById('totalCost').value = totalCost;
-            document.getElementById('mamun').value = (mamun === 'undefined' || mamun === '') ? '' : mamun;
-            document.getElementById('hanif').value = (hanif === 'undefined' || hanif === '') ? '' : hanif;
-            document.getElementById('submitBtn').innerText = 'Update Data';
+            document.getElementById('mamun').value = mamun === '0' ? '' : mamun;
+            document.getElementById('hanif').value = hanif === '0' ? '' : hanif;
+            document.getElementById('submitBtn').innerText = 'Update Entry';
         }
 
         async function deleteRow(rowId) {
@@ -344,15 +335,11 @@
                 formData.append('action', 'delete');
                 formData.append('rowId', rowId);
 
-                const response = await fetch(url, {
+                await fetch(url, {
                     method: 'POST',
                     body: formData,
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    }
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
                 });
-                const result = await response.json();
-                alert(result.message || 'Deleted successfully');
                 fetchData();
             } catch (error) {
                 alert('Error deleting row.');
@@ -361,7 +348,7 @@
         }
 
         function resetForm() {
-            document.getElementById('formTitle').innerText = 'Add / Edit Data';
+            document.getElementById('formTitle').innerText = 'Insert / Update Entry';
             document.getElementById('rowId').value = '';
             document.getElementById('crudForm').reset();
             document.getElementById('submitBtn').innerText = 'Submit Data';
